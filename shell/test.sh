@@ -49,12 +49,12 @@ assert_throws() {
 }
 
 new_test_discord() {
-  root="$1"
-  version="${2:-app-1.0.100}"
-  content="${3:-$official}"
-  wrapper_dir="$root/$version/modules/discord_erlpack-1/discord_erlpack"
+  discord_root="$1"
+  discord_version="${2:-app-1.0.100}"
+  wrapper_content="${3:-$official}"
+  wrapper_dir="$discord_root/$discord_version/modules/discord_erlpack-1/discord_erlpack"
   mkdir -p "$wrapper_dir"
-  printf '%s\n' "$content" > "$wrapper_dir/index.js"
+  printf '%s\n' "$wrapper_content" > "$wrapper_dir/index.js"
 }
 
 invoke_test() {
@@ -115,7 +115,8 @@ test_refuses_wrapper_outside_root() {
   outside="$test_root/outside"
   new_test_discord "$outside"
   mkdir -p "$root/app-1.0.100/modules"
-  if ! ln -s "$outside/app-1.0.100/modules/discord_erlpack-1" "$root/app-1.0.100/modules/discord_erlpack-1" 2>/dev/null; then
+  link_path="$root/app-1.0.100/modules/discord_erlpack-1"
+  if ! ln -s "$outside/app-1.0.100/modules/discord_erlpack-1" "$link_path" 2>/dev/null || [ ! -L "$link_path" ]; then
     echo "SKIP: refuses wrapper outside root (symlink unavailable)"
     return
   fi
