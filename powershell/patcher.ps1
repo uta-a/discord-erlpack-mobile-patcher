@@ -194,9 +194,22 @@ function Assert-DiscordStopped {
         return
     }
     $processName = if ($ChannelName -eq "canary") { "DiscordCanary" } else { "Discord" }
-    if (Get-Process -Name $processName -ErrorAction SilentlyContinue) {
-        throw "Discord $ChannelName is running; fully exit it before changing the patch"
+    $processes = @(Get-Process -Name $processName -ErrorAction SilentlyContinue)
+    if ($processes.Count -eq 0) {
+        return
     }
+
+    Write-Host "Discord $ChannelName is running; stopping it before changing the patch..." -ForegroundColor Yellow
+    $processes | Stop-Process -Force -ErrorAction Stop
+
+    for ($attempt = 0; $attempt -lt 50; $attempt++) {
+        Start-Sleep -Milliseconds 200
+        if (-not (Get-Process -Name $processName -ErrorAction SilentlyContinue)) {
+            return
+        }
+    }
+
+    throw "Discord $ChannelName is still running after stop request"
 }
 
 function Get-BackupPath {
