@@ -1,11 +1,23 @@
-$scriptPath = Join-Path $PSScriptRoot "patcher.ps1"
-. $scriptPath -NoRun
-
 Describe "PowerShell patcher" {
+    BeforeAll {
+        $scriptPath = Join-Path $PSScriptRoot "patcher.ps1"
+        . $scriptPath -NoRun
+
+        function New-TestDiscord {
+            param([string]$Name, [string]$Version = "app-1.0.100", [string]$Content = $script:Official)
+            $root = Join-Path $TestDrive $Name
+            $wrapperDirectory = Join-Path $root "$Version\modules\discord_erlpack-1\discord_erlpack"
+            New-Item -ItemType Directory -Path $wrapperDirectory -Force | Out-Null
+            $wrapper = Join-Path $wrapperDirectory "index.js"
+            [IO.File]::WriteAllText($wrapper, $Content)
+            return $root
+        }
+    }
+
     BeforeEach {
         $script:SkipProcessCheck = $true
         $script:OriginalLocalAppData = $env:LOCALAPPDATA
-        $env:LOCALAPPDATA = Join-Path $TestDrive "local"
+        $env:LOCALAPPDATA = Join-Path $TestDrive ("local-" + [Guid]::NewGuid())
         New-Item -ItemType Directory -Path $env:LOCALAPPDATA -Force | Out-Null
         $script:Official = "`"use strict`";`r`nmodule.exports = require('./discord_erlpack.node');`r`n"
     }
@@ -13,16 +25,6 @@ Describe "PowerShell patcher" {
     AfterEach {
         $script:SkipProcessCheck = $false
         $env:LOCALAPPDATA = $script:OriginalLocalAppData
-    }
-
-    function New-TestDiscord {
-        param([string]$Name, [string]$Version = "app-1.0.100", [string]$Content = $script:Official)
-        $root = Join-Path $TestDrive $Name
-        $wrapperDirectory = Join-Path $root "$Version\modules\discord_erlpack-1\discord_erlpack"
-        New-Item -ItemType Directory -Path $wrapperDirectory -Force | Out-Null
-        $wrapper = Join-Path $wrapperDirectory "index.js"
-        [IO.File]::WriteAllText($wrapper, $Content)
-        return $root
     }
 
     It "selects the newest complete Discord version" {
@@ -56,8 +58,9 @@ Describe "PowerShell patcher" {
     }
 
     It "detects Stable and Canary" {
-        $null = New-TestDiscord "local\Discord"
-        $null = New-TestDiscord "local\DiscordCanary"
+        $localName = Split-Path -Leaf $env:LOCALAPPDATA
+        $null = New-TestDiscord "$localName\Discord"
+        $null = New-TestDiscord "$localName\DiscordCanary"
 
         $installations = @(Get-DetectedInstallations)
 
@@ -67,8 +70,6 @@ Describe "PowerShell patcher" {
     }
 
     It "fails immediately when no Discord installation is detected" {
-        Mock Get-DetectedInstallations { @() }
-
         { Invoke-Patcher "status" "auto" "" } | Should Throw
     }
 }
