@@ -308,6 +308,11 @@ function Show-Status {
 
 function Read-MenuChoice {
     param([Parameter(Mandatory)][string]$Prompt, [Parameter(Mandatory)][array]$Items)
+
+    if (-not [Console]::IsInputRedirected -and -not [Console]::IsOutputRedirected) {
+        return Read-ArrowMenuChoice $Prompt $Items
+    }
+
     Write-Host ""
     Write-Host $Prompt
     for ($index = 0; $index -lt $Items.Count; $index++) {
@@ -320,6 +325,63 @@ function Read-MenuChoice {
             return $number - 1
         }
         Write-Host "Enter a number from 1 to $($Items.Count)." -ForegroundColor Yellow
+    }
+}
+
+function Read-ArrowMenuChoice {
+    param([Parameter(Mandatory)][string]$Prompt, [Parameter(Mandatory)][array]$Items)
+
+    $selectedIndex = 0
+    $top = [Console]::CursorTop
+    $left = [Console]::CursorLeft
+    $cursorWasVisible = [Console]::CursorVisible
+    [Console]::CursorVisible = $false
+
+    try {
+        while ($true) {
+            [Console]::SetCursorPosition($left, $top)
+            Write-Host ""
+            Write-Host $Prompt
+            Write-Host "Use Up/Down arrows and Enter. Esc cancels." -ForegroundColor DarkGray
+
+            for ($index = 0; $index -lt $Items.Count; $index++) {
+                $prefix = if ($index -eq $selectedIndex) { ">" } else { " " }
+                $foreground = if ($index -eq $selectedIndex) { [ConsoleColor]::Black } else { [Console]::ForegroundColor }
+                $background = if ($index -eq $selectedIndex) { [ConsoleColor]::White } else { [Console]::BackgroundColor }
+                Write-Host ("  {0} {1}" -f $prefix, $Items[$index]) -ForegroundColor $foreground -BackgroundColor $background
+            }
+
+            $clearLines = [Math]::Max(0, [Console]::WindowHeight - [Console]::CursorTop - 1)
+            if ($clearLines -gt 0) {
+                Write-Host ("`n" * [Math]::Min($clearLines, 1)) -NoNewline
+            }
+
+            $key = [Console]::ReadKey($true)
+            switch ($key.Key) {
+                "UpArrow" {
+                    $selectedIndex = if ($selectedIndex -le 0) { $Items.Count - 1 } else { $selectedIndex - 1 }
+                }
+                "DownArrow" {
+                    $selectedIndex = if ($selectedIndex -ge $Items.Count - 1) { 0 } else { $selectedIndex + 1 }
+                }
+                "Home" {
+                    $selectedIndex = 0
+                }
+                "End" {
+                    $selectedIndex = $Items.Count - 1
+                }
+                "Enter" {
+                    Write-Host ""
+                    return $selectedIndex
+                }
+                "Escape" {
+                    throw "cancelled"
+                }
+            }
+        }
+    }
+    finally {
+        [Console]::CursorVisible = $cursorWasVisible
     }
 }
 
@@ -382,6 +444,11 @@ if (-not $NoRun) {
         Invoke-Patcher $Action $Channel $DiscordPath
     }
     catch {
+        if ($_.Exception.Message -eq "cancelled") {
+            Write-Host ""
+            Write-Host "Cancelled."
+            return
+        }
         Write-Host ""
         Write-Host "Failed: $($_.Exception.Message)" -ForegroundColor Red
         throw

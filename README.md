@@ -29,26 +29,27 @@ irm https://github.com/uta-a/discord-erlpack-mobile-patcher/releases/latest/down
 
 ## PowerShell対話モード
 
-引数なしで起動すると、番号選択式のメニューを表示します。
+引数なしで起動すると、矢印キーで選択できるメニューを表示します。
+非対話環境や出力リダイレクト時は、従来の番号入力に自動で切り替わります。
 
 ```text
 Fake Mobile Status PowerShell Patcher
 
 What would you like to do?
-  1. Install
-  2. Uninstall
-  3. View status
-  4. Quit
-Select:
+Use Up/Down arrows and Enter. Esc cancels.
+  > Install
+    Uninstall
+    View status
+    Quit
 ```
 
 操作を選ぶと、検出済みのDiscordだけがバージョン・状態付きで表示されます。
 
 ```text
 Select Discord installation
-  1. stable - app-1.0.100 [official]
-  2. canary - app-1.0.200 [patched]
-Select:
+Use Up/Down arrows and Enter. Esc cancels.
+  > stable - app-1.0.100 [official]
+    canary - app-1.0.200 [patched]
 ```
 
 処理後は `Success` または `Failed` と理由を表示します。
