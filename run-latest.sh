@@ -2,10 +2,10 @@
 set -eu
 
 repository="uta-a/discord-erlpack-mobile-patcher"
-releases_api="https://api.github.com/repos/$repository/releases?per_page=30"
 user_agent="fake-mobile-status-installer"
 script_name="patcher.sh"
 checksum_name="$script_name.sha256"
+release_base_url="https://github.com/$repository/releases/latest/download"
 
 case "$(uname -s)" in
   Darwin) ;;
@@ -15,35 +15,14 @@ esac
 temporary_directory="$(mktemp -d "${TMPDIR:-/tmp}/fake-mobile-status.XXXXXX")"
 trap 'rm -rf "$temporary_directory"' EXIT HUP INT TERM
 
-release_json="$temporary_directory/release.json"
 script_path="$temporary_directory/$script_name"
 checksum_path="$temporary_directory/$checksum_name"
 
 echo "Checking the latest shell patcher release..."
-curl --fail --location --silent --show-error \
-  --header "Accept: application/vnd.github+json" \
-  --header "X-GitHub-Api-Version: 2022-11-28" \
-  --user-agent "$user_agent" \
-  "$releases_api" > "$release_json"
-
-asset_url() {
-  asset_name="$1"
-  sed -n 's/.*"browser_download_url":[[:space:]]*"\([^"]*\)".*/\1/p' "$release_json" |
-    grep "/$asset_name$" |
-    head -n 1
-}
-
-script_url="$(asset_url "$script_name")"
-checksum_url="$(asset_url "$checksum_name")"
-if [ -z "$script_url" ] || [ -z "$checksum_url" ]; then
-  echo "Required shell patcher release assets were not found." >&2
-  exit 1
-fi
-
 curl --fail --location --silent --show-error --user-agent "$user_agent" \
-  "$script_url" --output "$script_path"
+  "$release_base_url/$script_name" --output "$script_path"
 curl --fail --location --silent --show-error --user-agent "$user_agent" \
-  "$checksum_url" --output "$checksum_path"
+  "$release_base_url/$checksum_name" --output "$checksum_path"
 
 expected_hash="$(awk 'NR == 1 { print tolower($1) }' "$checksum_path")"
 case "$expected_hash" in
