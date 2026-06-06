@@ -63,6 +63,14 @@ try {
         Assert-Equal (Get-InstallationStatus "stable" $root).Status "official" "restored status"
     }
 
+    Invoke-Test "uninstalls patched wrapper without backup" {
+        $env:LOCALAPPDATA = Join-Path $testRoot "data-no-backup"
+        $root = New-TestDiscord "no-backup" "app-1.0.100" (Get-PatchedWrapper)
+        $installation = Get-InstallationStatus "canary" $root
+        Assert-Equal (Uninstall-MobilePatch $installation) "official wrapper restored without backup" "uninstall result"
+        Assert-Equal (Get-InstallationStatus "canary" $root).Status "official" "restored status"
+    }
+
     Invoke-Test "refuses unknown wrapper" {
         $env:LOCALAPPDATA = Join-Path $testRoot "data-unknown"
         $root = New-TestDiscord "unknown" "app-1.0.100" "module.exports = thirdParty;"

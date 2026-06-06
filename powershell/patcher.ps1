@@ -19,6 +19,10 @@ $script:OfficialWrappers = @(
     "`"use strict`";`nmodule.exports = require(`"./discord_erlpack.node`");"
 )
 
+function Get-OfficialWrapper {
+    return "`"use strict`";`nmodule.exports = require('./discord_erlpack.node');`n"
+}
+
 function Get-PatchedWrapper {
     @'
 "use strict";
@@ -267,15 +271,18 @@ function Uninstall-MobilePatch {
     }
 
     $backup = Get-BackupPath $Installation.Channel $Installation.AppVersion
-    if (-not (Test-Path -LiteralPath $backup -PathType Leaf)) {
-        throw "official backup was not found: $backup"
+    if (Test-Path -LiteralPath $backup -PathType Leaf) {
+        $official = [IO.File]::ReadAllText($backup)
+        if ((Get-WrapperStatus $official) -ne "official") {
+            throw "backup is not an official discord_erlpack wrapper"
+        }
+        Write-VerifiedFile $Installation.Wrapper $official
+        return "official wrapper restored"
     }
-    $official = [IO.File]::ReadAllText($backup)
-    if ((Get-WrapperStatus $official) -ne "official") {
-        throw "backup is not an official discord_erlpack wrapper"
-    }
+
+    $official = Get-OfficialWrapper
     Write-VerifiedFile $Installation.Wrapper $official
-    return "official wrapper restored"
+    return "official wrapper restored without backup"
 }
 
 function Select-Installation {
