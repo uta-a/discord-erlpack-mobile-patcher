@@ -40,4 +40,8 @@ if [ "$actual_hash" != "$expected_hash" ]; then
 fi
 
 echo "Verified latest release. Starting shell patcher..."
-sh "$script_path" "$@"
+if [ "$#" -eq 0 ] && [ -r /dev/tty ]; then
+  sh "$script_path" "$@" </dev/tty
+else
+  sh "$script_path" "$@"
+fi

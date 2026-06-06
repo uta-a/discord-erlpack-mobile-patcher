@@ -366,6 +366,9 @@ read_menu_choice() {
   if [ -t 0 ] && [ -t 1 ]; then
     read_arrow_choice "$prompt" "$labels"
   else
+    if [ "$action" = "menu" ] && [ ! -t 0 ]; then
+      fail "interactive menu requires a terminal; run the launcher directly or pass status/install/uninstall"
+    fi
     read_number_choice "$prompt" "$labels"
   fi
 }
