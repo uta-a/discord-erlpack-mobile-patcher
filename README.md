@@ -5,51 +5,69 @@ Windows / macOS の Discord Stable と Discord Canary を自動検出し、
 
 `app.asar`、`_app.asar`、`core.asar`、Vencordのファイルは変更しません。
 
-## 対話モード
+Windowsでは、未署名EXEを起動せずPowerShell内だけで完結する方式を推奨します。
 
-引数なしで起動すると、Vencord Installer CLIに近い選択UIを表示します。
+## Windows PowerShell版
+
+以下のコマンドは最新版の`patcher.ps1`とSHA-256ファイルを一時フォルダへダウンロードし、
+一致を確認してからPowerShellスクリプトとして実行します。EXEはダウンロード・起動しません。
+
+```powershell
+irm https://github.com/uta-a/discord-erlpack-mobile-patcher/releases/latest/download/run-latest.ps1 | iex
+```
+
+処理後は、一時フォルダへダウンロードしたファイルを削除します。
+
+非対話で実行する場合:
+
+```powershell
+irm https://github.com/uta-a/discord-erlpack-mobile-patcher/releases/latest/download/run-latest.ps1 -OutFile run-latest.ps1
+.\run-latest.ps1 -Action status
+.\run-latest.ps1 -Action install -Channel stable
+.\run-latest.ps1 -Action uninstall -Channel canary
+```
+
+## PowerShell対話モード
+
+引数なしで起動すると、番号選択式のメニューを表示します。
 
 ```text
-Fake Mobile Status Installer dev
+Fake Mobile Status PowerShell Patcher
 
-Use the arrow keys to navigate: ↓ ↑ → ←
-? What would you like to do? (Press Enter to confirm):
-  ▸ Install
-    Uninstall
-    View status
-    Quit
+What would you like to do?
+  1. Install
+  2. Uninstall
+  3. View status
+  4. Quit
+Select:
 ```
 
 操作を選ぶと、検出済みのDiscordだけがバージョン・状態付きで表示されます。
 
 ```text
-? Select Discord installation to Install (Press Enter to confirm):
-  ▸ Discord Stable - app-1.0.100 [NOT PATCHED]
-    Discord Canary - app-1.0.200 [PATCHED]
+Select Discord installation
+  1. stable - app-1.0.100 [official]
+  2. canary - app-1.0.200 [patched]
+Select:
 ```
 
-処理後は `Success` または `Failed` と理由を表示し、Enterを押すまでウィンドウを
-閉じません。エクスプローラーから直接起動した場合も結果を確認できます。
+処理後は `Success` または `Failed` と理由を表示します。
 
-## 非対話モード
+## PowerShellローカル実行
 
-スクリプトや自動化では従来どおりコマンドを指定できます。
-`--channel` の既定値は `auto` です。`install` / `uninstall` ではStableを優先し、
-StableがなければCanaryを選びます。`status` は検出済みの全チャンネルを表示します。
+リポジトリをclone済みの場合、ダウンロードなしでも実行できます。
 
-```text
-erlpack-patcher.exe status
-erlpack-patcher.exe install
-erlpack-patcher.exe uninstall
-
-erlpack-patcher.exe --channel stable install
-erlpack-patcher.exe --channel canary uninstall
+```powershell
+.\powershell\patcher.ps1
+.\powershell\patcher.ps1 -Action status
+.\powershell\patcher.ps1 -Action install -Channel stable
+.\powershell\patcher.ps1 -Action uninstall -Channel canary
 ```
 
 通常と異なる場所へDiscordをインストールしている場合は、チャンネルも明示します。
 
-```text
-erlpack-patcher.exe --channel canary --discord-path "D:\Apps\DiscordCanary" status
+```powershell
+.\powershell\patcher.ps1 -Action status -Channel canary -DiscordPath "D:\Apps\DiscordCanary"
 ```
 
 自動検出する場所:
@@ -66,9 +84,15 @@ macOS Canary:    ~/Library/Application Support/discordcanary
 
 Discord更新後は新しいバージョンへ再度 `install` を実行してください。
 
-## ローカルビルド
+## テスト
 
-Go 1.24以降を使用します。
+PowerShell版:
+
+```powershell
+Invoke-Pester .\powershell\patcher.Tests.ps1
+```
+
+Go版:
 
 ```powershell
 go test ./...
@@ -78,35 +102,27 @@ go build -trimpath -ldflags="-s -w" -o dist/erlpack-patcher.exe ./cmd/erlpack-pa
 
 GitHub ActionsではWindows x64、macOS x64、macOS arm64向けバイナリを生成します。
 
-## 配布時の注意
+## Go版の配布時の注意
 
 GitHub Actionsが生成するバイナリは未署名です。一般配布する場合は、Windows版を
 Authenticode署名し、macOS版をDeveloper ID署名してnotarizationしてください。
 
 macOS向けのパス検出とビルドには対応していますが、実機上でのパッチ適用は未検証です。
 
-## 最新版をダウンロードして実行
+## Goバイナリ版
 
-GitHub Releaseの最新版を一時ディレクトリへダウンロードし、公開されたSHA-256と
-一致することを確認してから起動できます。終了後、ダウンロードしたファイルは削除されます。
+macOSではGoバイナリ版を使用します。
 
-Windows PowerShell:
-
-```powershell
-irm https://github.com/uta-a/discord-erlpack-mobile-patcher/releases/latest/download/run-latest.ps1 | iex
+```text
+erlpack-patcher status
+erlpack-patcher install
+erlpack-patcher uninstall
 ```
 
-macOS:
+最新版をダウンロードして実行:
 
 ```sh
 curl -fsSL https://github.com/uta-a/discord-erlpack-mobile-patcher/releases/latest/download/run-latest.sh | sh
-```
-
-リポジトリ内のスクリプトから非対話コマンドを渡す場合:
-
-```powershell
-.\run-latest.ps1 status
-.\run-latest.ps1 --channel canary install
 ```
 
 ```sh
