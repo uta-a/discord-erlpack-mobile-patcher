@@ -13,6 +13,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $script:PatchMarker = "fake-mobile-status:erlpack-patcher:v1"
+$script:SkipProcessCheck = $false
 $script:OfficialWrappers = @(
     "`"use strict`";`nmodule.exports = require('./discord_erlpack.node');",
     "`"use strict`";`nmodule.exports = require(`"./discord_erlpack.node`");"
@@ -185,6 +186,9 @@ function Get-DetectedInstallations {
 function Assert-DiscordStopped {
     param([Parameter(Mandatory)][ValidateSet("stable", "canary")][string]$ChannelName)
 
+    if ($script:SkipProcessCheck) {
+        return
+    }
     $processName = if ($ChannelName -eq "canary") { "DiscordCanary" } else { "Discord" }
     if (Get-Process -Name $processName -ErrorAction SilentlyContinue) {
         throw "Discord $ChannelName is running; fully exit it before changing the patch"

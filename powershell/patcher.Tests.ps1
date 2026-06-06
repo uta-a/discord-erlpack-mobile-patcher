@@ -3,7 +3,7 @@ $scriptPath = Join-Path $PSScriptRoot "patcher.ps1"
 
 Describe "PowerShell patcher" {
     BeforeEach {
-        Mock Assert-DiscordStopped {}
+        $script:SkipProcessCheck = $true
         $script:OriginalLocalAppData = $env:LOCALAPPDATA
         $env:LOCALAPPDATA = Join-Path $TestDrive "local"
         New-Item -ItemType Directory -Path $env:LOCALAPPDATA -Force | Out-Null
@@ -11,6 +11,7 @@ Describe "PowerShell patcher" {
     }
 
     AfterEach {
+        $script:SkipProcessCheck = $false
         $env:LOCALAPPDATA = $script:OriginalLocalAppData
     }
 
