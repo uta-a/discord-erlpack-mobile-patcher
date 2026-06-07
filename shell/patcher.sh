@@ -60,9 +60,7 @@ erlpack.pack = function (payload, ...rest) {
           ...payload.d,
           properties: {
             ...payload.d.properties,
-            os: "Android",
-            browser: "Discord Android",
-            device: "Discord Android"
+            browser: "Discord Android"
           }
         }
       };

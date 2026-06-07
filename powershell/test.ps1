@@ -6,6 +6,37 @@ $originalLocalAppData = $env:LOCALAPPDATA
 $script:SkipProcessCheck = $true
 $official = "`"use strict`";`r`nmodule.exports = require('./discord_erlpack.node');`r`n"
 $stalePatch = "`"use strict`";`r`n// fake-mobile-status:erlpack-patcher:v1`r`nmodule.exports = require(`"./discord_erlpack.node`");`r`n"
+$oldAndroidPatch = @'
+"use strict";
+// fake-mobile-status:erlpack-patcher:v1
+const erlpack = require("./discord_erlpack.node");
+const originalPack = erlpack.pack;
+
+erlpack.pack = function (payload, ...rest) {
+  let nextPayload = payload;
+  try {
+    if (payload?.op === 2 && payload?.d?.properties) {
+      nextPayload = {
+        ...payload,
+        d: {
+          ...payload.d,
+          properties: {
+            ...payload.d.properties,
+            os: "Android",
+            browser: "Discord Android",
+            device: "Discord Android"
+          }
+        }
+      };
+    }
+  } catch {
+    nextPayload = payload;
+  }
+  return originalPack.call(this, nextPayload, ...rest);
+};
+
+module.exports = erlpack;
+'@
 $passed = 0
 
 function Assert-Equal {
@@ -24,6 +55,13 @@ function Assert-Throws {
         return
     }
     throw "$Message. Expected an exception."
+}
+
+function Assert-NotContains {
+    param([string]$Actual, [string]$Needle, [string]$Message)
+    if ($Actual.Contains($Needle)) {
+        throw "$Message. Unexpected '$Needle'."
+    }
 }
 
 function New-TestDiscord {
@@ -86,12 +124,32 @@ try {
         Assert-Equal (Get-InstallationStatus "stable" $root).Status "stale-patch" "stale patch status"
     }
 
+    Invoke-Test "detects old Android patch as stale" {
+        $env:LOCALAPPDATA = Join-Path $testRoot "data-old-android-stale"
+        $root = New-TestDiscord "old-android-stale" "app-1.0.100" $oldAndroidPatch
+        Assert-Equal (Get-InstallationStatus "stable" $root).Status "stale-patch" "old Android patch status"
+    }
+
     Invoke-Test "repairs stale patch" {
         $env:LOCALAPPDATA = Join-Path $testRoot "data-repair-stale"
         $root = New-TestDiscord "repair-stale" "app-1.0.100" $stalePatch
         $installation = Get-InstallationStatus "stable" $root
         Assert-Equal (Install-MobilePatch $installation) "patch repaired" "stale patch repair result"
         Assert-Equal (Get-InstallationStatus "stable" $root).Status "patched" "repaired status"
+    }
+
+    Invoke-Test "repairs old Android patch" {
+        $env:LOCALAPPDATA = Join-Path $testRoot "data-repair-old-android"
+        $root = New-TestDiscord "repair-old-android" "app-1.0.100" $oldAndroidPatch
+        $installation = Get-InstallationStatus "stable" $root
+        Assert-Equal (Install-MobilePatch $installation) "patch repaired" "old Android patch repair result"
+        Assert-Equal (Get-InstallationStatus "stable" $root).Status "patched" "old Android repaired status"
+        $content = [IO.File]::ReadAllText($installation.Wrapper)
+        if (-not $content.Contains('browser: "Discord Android"')) {
+            throw "current patch browser spoof missing."
+        }
+        Assert-NotContains $content 'os: "Android"' "current patch should preserve os"
+        Assert-NotContains $content 'device: "Discord Android"' "current patch should preserve device"
     }
 
     Invoke-Test "uninstalls stale patch" {

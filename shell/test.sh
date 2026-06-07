@@ -23,6 +23,35 @@ module.exports = require('\''./discord_erlpack.node'\'');'
 stale_patch='"use strict";
 // fake-mobile-status:erlpack-patcher:v1
 module.exports = require("./discord_erlpack.node");'
+old_android_patch='"use strict";
+// fake-mobile-status:erlpack-patcher:v1
+const erlpack = require("./discord_erlpack.node");
+const originalPack = erlpack.pack;
+
+erlpack.pack = function (payload, ...rest) {
+  let nextPayload = payload;
+  try {
+    if (payload?.op === 2 && payload?.d?.properties) {
+      nextPayload = {
+        ...payload,
+        d: {
+          ...payload.d,
+          properties: {
+            ...payload.d.properties,
+            os: "Android",
+            browser: "Discord Android",
+            device: "Discord Android"
+          }
+        }
+      };
+    }
+  } catch {
+    nextPayload = payload;
+  }
+  return originalPack.call(this, nextPayload, ...rest);
+};
+
+module.exports = erlpack;'
 
 assert_equal() {
   actual="$1"
@@ -41,6 +70,16 @@ assert_contains() {
   case "$haystack" in
     *"$needle"*) ;;
     *) echo "FAIL: $message. Missing '$needle'." >&2; exit 1 ;;
+  esac
+}
+
+assert_not_contains() {
+  haystack="$1"
+  needle="$2"
+  message="$3"
+  case "$haystack" in
+    *"$needle"*) echo "FAIL: $message. Unexpected '$needle'." >&2; exit 1 ;;
+    *) ;;
   esac
 }
 
@@ -105,6 +144,13 @@ test_detects_stale_patch() {
   assert_contains "$output" "Status:  stale-patch" "stale patch status"
 }
 
+test_detects_old_android_patch_as_stale() {
+  root="$test_root/old-android-stale"
+  new_test_discord "$root" "app-1.0.100" "$old_android_patch"
+  output=$(sh "$patcher" status --channel stable --discord-path "$root")
+  assert_contains "$output" "Status:  stale-patch" "old Android patch status"
+}
+
 test_repairs_stale_patch() {
   root="$test_root/repair-stale"
   new_test_discord "$root" "app-1.0.100" "$stale_patch"
@@ -112,6 +158,20 @@ test_repairs_stale_patch() {
   assert_contains "$output" "Success: patch repaired" "stale patch repair result"
   output=$(sh "$patcher" status --channel stable --discord-path "$root")
   assert_contains "$output" "Status:  patched" "repaired status"
+}
+
+test_repairs_old_android_patch() {
+  root="$test_root/repair-old-android"
+  wrapper="$root/app-1.0.100/modules/discord_erlpack-1/discord_erlpack/index.js"
+  new_test_discord "$root" "app-1.0.100" "$old_android_patch"
+  output=$(sh "$patcher" install --channel stable --discord-path "$root")
+  assert_contains "$output" "Success: patch repaired" "old Android patch repair result"
+  output=$(sh "$patcher" status --channel stable --discord-path "$root")
+  assert_contains "$output" "Status:  patched" "old Android repaired status"
+  content=$(cat "$wrapper")
+  assert_contains "$content" 'browser: "Discord Android"' "current patch browser spoof"
+  assert_not_contains "$content" 'os: "Android"' "current patch should preserve os"
+  assert_not_contains "$content" 'device: "Discord Android"' "current patch should preserve device"
 }
 
 test_uninstalls_stale_patch() {
@@ -166,7 +226,9 @@ invoke_test "selects newest complete Discord version" test_selects_newest_comple
 invoke_test "installs and uninstalls" test_installs_and_uninstalls
 invoke_test "refuses unknown wrapper" test_refuses_unknown_wrapper
 invoke_test "detects stale patch" test_detects_stale_patch
+invoke_test "detects old Android patch as stale" test_detects_old_android_patch_as_stale
 invoke_test "repairs stale patch" test_repairs_stale_patch
+invoke_test "repairs old Android patch" test_repairs_old_android_patch
 invoke_test "uninstalls stale patch" test_uninstalls_stale_patch
 invoke_test "keeps current patch status" test_keeps_current_patch_status
 invoke_test "detects Stable and Canary" test_detects_stable_and_canary
