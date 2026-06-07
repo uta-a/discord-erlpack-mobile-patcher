@@ -80,6 +80,7 @@ EOF
 wrapper_status() {
   file="$1"
   content=$(normalize_content "$file")
+  patched=$(patched_wrapper)
   official_single=$(printf '"use strict";\nmodule.exports = require('\''./discord_erlpack.node'\'');')
   official_double=$(printf '"use strict";\nmodule.exports = require("./discord_erlpack.node");')
 
@@ -87,8 +88,12 @@ wrapper_status() {
     echo "official"
     return
   fi
-  if printf '%s\n' "$content" | grep -F "$patch_marker" >/dev/null 2>&1; then
+  if [ "$content" = "$patched" ]; then
     echo "patched"
+    return
+  fi
+  if printf '%s\n' "$content" | grep -F "$patch_marker" >/dev/null 2>&1; then
+    echo "stale-patch"
     return
   fi
   echo "unknown/third-party"
@@ -233,6 +238,11 @@ install_patch() {
 
   assert_discord_stopped "$channel_name"
   [ "$status" = "patched" ] && { echo "patch is already applied"; return; }
+  if [ "$status" = "stale-patch" ]; then
+    write_verified_text "$wrapper"
+    echo "patch repaired"
+    return
+  fi
   [ "$status" = "official" ] || fail "refusing to overwrite unknown discord_erlpack wrapper: $wrapper"
 
   backup=$(backup_path "$channel_name" "$app_version")
@@ -254,7 +264,7 @@ uninstall_patch() {
 
   assert_discord_stopped "$channel_name"
   [ "$status" = "official" ] && { echo "wrapper is already official"; return; }
-  [ "$status" = "patched" ] || fail "patched wrapper has changed; refusing to overwrite it: $wrapper"
+  [ "$status" = "patched" ] || [ "$status" = "stale-patch" ] || fail "patched wrapper has changed; refusing to overwrite it: $wrapper"
 
   backup=$(backup_path "$channel_name" "$app_version")
   [ -f "$backup" ] || fail "official backup was not found: $backup"

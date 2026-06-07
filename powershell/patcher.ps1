@@ -74,6 +74,9 @@ function Get-WrapperStatus {
     if ($normalized -ceq (Get-NormalizedContent (Get-PatchedWrapper))) {
         return "patched"
     }
+    if ($normalized.Contains($script:PatchMarker)) {
+        return "stale-patch"
+    }
     return "unknown/third-party"
 }
 
@@ -253,6 +256,10 @@ function Install-MobilePatch {
     if ($Installation.Status -eq "patched") {
         return "patch is already applied"
     }
+    if ($Installation.Status -eq "stale-patch") {
+        Write-VerifiedFile $Installation.Wrapper (Get-PatchedWrapper)
+        return "patch repaired"
+    }
     if ($Installation.Status -ne "official") {
         throw "refusing to overwrite unknown discord_erlpack wrapper: $($Installation.Wrapper)"
     }
@@ -279,7 +286,7 @@ function Uninstall-MobilePatch {
     if ($Installation.Status -eq "official") {
         return "wrapper is already official"
     }
-    if ($Installation.Status -ne "patched") {
+    if ($Installation.Status -ne "patched" -and $Installation.Status -ne "stale-patch") {
         throw "patched wrapper has changed; refusing to overwrite it: $($Installation.Wrapper)"
     }
 

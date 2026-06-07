@@ -20,6 +20,9 @@ mkdir -p "$HOME"
 
 official='"use strict";
 module.exports = require('\''./discord_erlpack.node'\'');'
+stale_patch='"use strict";
+// fake-mobile-status:erlpack-patcher:v1
+module.exports = require("./discord_erlpack.node");'
 
 assert_equal() {
   actual="$1"
@@ -95,6 +98,42 @@ test_refuses_unknown_wrapper() {
   assert_equal "$content" "module.exports = thirdParty;" "unknown wrapper changed"
 }
 
+test_detects_stale_patch() {
+  root="$test_root/stale"
+  new_test_discord "$root" "app-1.0.100" "$stale_patch"
+  output=$(sh "$patcher" status --channel stable --discord-path "$root")
+  assert_contains "$output" "Status:  stale-patch" "stale patch status"
+}
+
+test_repairs_stale_patch() {
+  root="$test_root/repair-stale"
+  new_test_discord "$root" "app-1.0.100" "$stale_patch"
+  output=$(sh "$patcher" install --channel stable --discord-path "$root")
+  assert_contains "$output" "Success: patch repaired" "stale patch repair result"
+  output=$(sh "$patcher" status --channel stable --discord-path "$root")
+  assert_contains "$output" "Status:  patched" "repaired status"
+}
+
+test_uninstalls_stale_patch() {
+  root="$test_root/uninstall-stale"
+  wrapper="$root/app-1.0.100/modules/discord_erlpack-1/discord_erlpack/index.js"
+  new_test_discord "$root"
+  sh "$patcher" install --channel stable --discord-path "$root" >/dev/null
+  printf '%s\n' "$stale_patch" > "$wrapper"
+  output=$(sh "$patcher" uninstall --channel stable --discord-path "$root")
+  assert_contains "$output" "Success: official wrapper restored" "stale patch uninstall result"
+  content=$(cat "$wrapper")
+  assert_equal "$content" "$official" "stale patch uninstall content"
+}
+
+test_keeps_current_patch_status() {
+  root="$test_root/current-patch"
+  new_test_discord "$root"
+  sh "$patcher" install --channel stable --discord-path "$root" >/dev/null
+  output=$(sh "$patcher" status --channel stable --discord-path "$root")
+  assert_contains "$output" "Status:  patched" "current patch status"
+}
+
 test_detects_stable_and_canary() {
   support="$HOME/Library/Application Support"
   new_test_discord "$support/discord"
@@ -126,6 +165,10 @@ test_refuses_wrapper_outside_root() {
 invoke_test "selects newest complete Discord version" test_selects_newest_complete_version
 invoke_test "installs and uninstalls" test_installs_and_uninstalls
 invoke_test "refuses unknown wrapper" test_refuses_unknown_wrapper
+invoke_test "detects stale patch" test_detects_stale_patch
+invoke_test "repairs stale patch" test_repairs_stale_patch
+invoke_test "uninstalls stale patch" test_uninstalls_stale_patch
+invoke_test "keeps current patch status" test_keeps_current_patch_status
 invoke_test "detects Stable and Canary" test_detects_stable_and_canary
 invoke_test "fails with no detected Discord" test_fails_with_no_detected_discord
 invoke_test "refuses wrapper outside root" test_refuses_wrapper_outside_root

@@ -5,6 +5,7 @@ $testRoot = Join-Path ([IO.Path]::GetTempPath()) ("discord-erlpack-patcher-test-
 $originalLocalAppData = $env:LOCALAPPDATA
 $script:SkipProcessCheck = $true
 $official = "`"use strict`";`r`nmodule.exports = require('./discord_erlpack.node');`r`n"
+$stalePatch = "`"use strict`";`r`n// fake-mobile-status:erlpack-patcher:v1`r`nmodule.exports = require(`"./discord_erlpack.node`");`r`n"
 $passed = 0
 
 function Assert-Equal {
@@ -77,6 +78,36 @@ try {
         $installation = Get-InstallationStatus "stable" $root
         Assert-Throws { Install-MobilePatch $installation } "unknown wrapper was overwritten"
         Assert-Equal ([IO.File]::ReadAllText($installation.Wrapper)) "module.exports = thirdParty;" "unknown wrapper changed"
+    }
+
+    Invoke-Test "detects stale patch" {
+        $env:LOCALAPPDATA = Join-Path $testRoot "data-stale"
+        $root = New-TestDiscord "stale" "app-1.0.100" $stalePatch
+        Assert-Equal (Get-InstallationStatus "stable" $root).Status "stale-patch" "stale patch status"
+    }
+
+    Invoke-Test "repairs stale patch" {
+        $env:LOCALAPPDATA = Join-Path $testRoot "data-repair-stale"
+        $root = New-TestDiscord "repair-stale" "app-1.0.100" $stalePatch
+        $installation = Get-InstallationStatus "stable" $root
+        Assert-Equal (Install-MobilePatch $installation) "patch repaired" "stale patch repair result"
+        Assert-Equal (Get-InstallationStatus "stable" $root).Status "patched" "repaired status"
+    }
+
+    Invoke-Test "uninstalls stale patch" {
+        $env:LOCALAPPDATA = Join-Path $testRoot "data-uninstall-stale"
+        $root = New-TestDiscord "uninstall-stale"
+        $installation = Get-InstallationStatus "stable" $root
+        Assert-Equal (Install-MobilePatch $installation) "patch applied" "install result"
+        [IO.File]::WriteAllText($installation.Wrapper, $stalePatch)
+        $installation = Get-InstallationStatus "stable" $root
+        Assert-Equal (Uninstall-MobilePatch $installation) "official wrapper restored" "stale patch uninstall result"
+        Assert-Equal (Get-InstallationStatus "stable" $root).Status "official" "restored status"
+    }
+
+    Invoke-Test "keeps current patch status" {
+        $root = New-TestDiscord "current-patch" "app-1.0.100" (Get-PatchedWrapper)
+        Assert-Equal (Get-InstallationStatus "stable" $root).Status "patched" "current patch status"
     }
 
     Invoke-Test "detects Stable and Canary" {
